@@ -9,7 +9,10 @@ A sample application to try out some tools, namely:
 $ docker-compose build
 $ docker-compose up -d
 
-## Call APIs from your host machine
+## And now you can access via your favorite browser
+# -> Go to http://localhost:8080
+#
+## OR you can directly call APIs
 # GET
 $ curl localhost:8080/api/comments
 # or POST

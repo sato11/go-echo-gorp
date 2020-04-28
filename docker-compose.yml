@@ -11,6 +11,8 @@ services:
       PORT: '8080'
     ports:
       - '8080:8080'
+    volumes:
+      - ./static:/app/static
 
   db:
     image: postgres:12.2
