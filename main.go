@@ -25,42 +25,69 @@ type Comment struct {
 var dsn = os.Getenv("DSN")
 var port = os.Getenv("PORT")
 
-func main() {
+func setupDB() (*gorp.DbMap, error) {
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	dbmap := &gorp.DbMap{Db: db, Dialect: gorp.PostgresDialect{}}
 	dbmap.AddTableWithName(Comment{}, "comments")
 	err = dbmap.CreateTablesIfNotExists()
 	if err != nil {
+		return nil, err
+	}
+
+	return dbmap, nil
+}
+
+func setupEcho() *echo.Echo {
+	e := echo.New()
+	return e
+}
+
+// Controller groups api functions by route
+type Controller struct {
+	dbmap *gorp.DbMap
+}
+
+// ListComments returns an array of comments
+func (controller *Controller) ListComments(c echo.Context) error {
+	var comments []Comment
+	_, err := controller.dbmap.Select(&comments, "SELECT * FROM comments ORDER BY created DESC LIMIT 10")
+	if err != nil {
+		c.Logger().Error("Select: ", err)
+		return c.String(http.StatusBadRequest, "Select: "+err.Error())
+	}
+	return c.JSON(http.StatusOK, comments)
+}
+
+// InsertComment creates a record in table and returns empty string
+func (controller *Controller) InsertComment(c echo.Context) error {
+	var comment Comment
+	if err := c.Bind(&comment); err != nil {
+		c.Logger().Error("Bind: ", err)
+		return c.String(http.StatusBadRequest, "Bind "+err.Error())
+	}
+	if err := controller.dbmap.Insert(&comment); err != nil {
+		c.Logger().Error("Insert: ", err)
+		return c.String(http.StatusBadRequest, "Insert: "+err.Error())
+	}
+	c.Logger().Infof("ADDED: %v", comment.ID)
+	return c.JSON(http.StatusCreated, "")
+}
+
+func main() {
+	dbmap, err := setupDB()
+	if err != nil {
 		log.Fatal(err)
 	}
 
-	e := echo.New()
-	e.GET("/api/comments", func(c echo.Context) error {
-		var comments []Comment
-		_, err := dbmap.Select(&comments, "SELECT * FROM comments ORDER BY created DESC LIMIT 10")
-		if err != nil {
-			c.Logger().Error("Select: ", err)
-			return c.String(http.StatusBadRequest, "Select: "+err.Error())
-		}
-		return c.JSON(http.StatusOK, comments)
-	})
-	e.POST("/api/comments", func(c echo.Context) error {
-		var comment Comment
-		if err = c.Bind(&comment); err != nil {
-			c.Logger().Error("Bind: ", err)
-			return c.String(http.StatusBadRequest, "Bind "+err.Error())
-		}
-		if err = dbmap.Insert(&comment); err != nil {
-			c.Logger().Error("Insert: ", err)
-			return c.String(http.StatusBadRequest, "Insert: "+err.Error())
-		}
-		c.Logger().Infof("ADDED: %v", comment.ID)
-		return c.JSON(http.StatusCreated, "")
-	})
+	controller := &Controller{dbmap: dbmap}
+
+	e := setupEcho()
+	e.GET("/api/comments", controller.ListComments)
+	e.POST("/api/comments", controller.InsertComment)
 	e.Static("/", "static/")
 	e.Logger.Fatal(e.Start(fmt.Sprintf(":%s", port)))
 }

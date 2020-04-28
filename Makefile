@@ -11,6 +11,10 @@ lint:
 	go vet ./...
 	golint -set_exit_status ./...
 
+.PHONY: test
+test:
+	go test -v ./...
+
 .PHONY: build
 build:
 	go build
