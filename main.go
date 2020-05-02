@@ -11,6 +11,7 @@ import (
 	"github.com/go-gorp/gorp"
 	"github.com/labstack/echo"
 	_ "github.com/lib/pq"
+	"gopkg.in/go-playground/validator.v9"
 )
 
 // Comment represents schema of the comments table
@@ -43,6 +44,7 @@ func setupDB() (*gorp.DbMap, error) {
 
 func setupEcho() *echo.Echo {
 	e := echo.New()
+	e.Validator = &Validator{validator: validator.New()}
 	return e
 }
 
@@ -69,12 +71,26 @@ func (controller *Controller) InsertComment(c echo.Context) error {
 		c.Logger().Error("Bind: ", err)
 		return c.String(http.StatusBadRequest, "Bind "+err.Error())
 	}
+	if err := c.Validate(&comment); err != nil {
+		c.Logger().Error("Validate: ", err)
+		return c.String(http.StatusBadRequest, "Validate "+err.Error())
+	}
 	if err := controller.dbmap.Insert(&comment); err != nil {
 		c.Logger().Error("Insert: ", err)
 		return c.String(http.StatusBadRequest, "Insert: "+err.Error())
 	}
 	c.Logger().Infof("ADDED: %v", comment.ID)
 	return c.JSON(http.StatusCreated, "")
+}
+
+// Validator represents validator
+type Validator struct {
+	validator *validator.Validate
+}
+
+// Validate validates parameters by checking struct tags
+func (v *Validator) Validate(i interface{}) error {
+	return v.validator.Struct(i)
 }
 
 func main() {
