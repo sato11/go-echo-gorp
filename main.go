@@ -48,6 +48,19 @@ func setupEcho() *echo.Echo {
 	return e
 }
 
+// PreInsert updates timestamp columns before insert
+func (c *Comment) PreInsert(s gorp.SqlExecutor) error {
+	c.Created = time.Now()
+	c.Updated = c.Created
+	return nil
+}
+
+// PreUpdate updates Updated column before update
+func (c *Comment) PreUpdate(s gorp.SqlExecutor) error {
+	c.Updated = time.Now()
+	return nil
+}
+
 // Controller groups api functions by route
 type Controller struct {
 	dbmap *gorp.DbMap
